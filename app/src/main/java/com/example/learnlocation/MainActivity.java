@@ -15,7 +15,10 @@ import android.widget.Toast;
 import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
 import com.baidu.location.LocationClient;
+import com.baidu.location.LocationClientOption;
+import com.baidu.mapapi.map.BaiduMap;
 import com.baidu.mapapi.map.MapView;
+import com.baidu.mapapi.map.MyLocationData;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,10 +38,11 @@ public class MainActivity extends AppCompatActivity {
 //            Manifest.permission.MOUNT_UNMOUNT_FILESYSTEMS
     };
 
-    private MapView mMapView = null;
-    private TextView txtPosition = null;
-
     private LocationClient mLocationClient = null;
+    private MapView mMapView = null;
+    private BaiduMap mBaiduMap = null;
+
+    private TextView txtPosition = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,9 +54,26 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onReceiveLocation(BDLocation bdLocation) {
+
+                //mapView 销毁后不在处理新接收的位置
+                if (bdLocation == null || mMapView == null){
+                    return;
+                }
+                MyLocationData locData = new MyLocationData.Builder()
+                        .accuracy(bdLocation.getRadius())
+                        // 此处设置开发者获取到的方向信息，顺时针0-360
+                        .direction(bdLocation.getDirection()).latitude(bdLocation.getLatitude())
+                        .longitude(bdLocation.getLongitude()).build();
+                mBaiduMap.setMyLocationData(locData);
+
                 StringBuilder currentPosition = new StringBuilder();
                 currentPosition.append("纬度:").append(bdLocation.getLatitude()).append("\n");
                 currentPosition.append("经度:").append(bdLocation.getLongitude()).append("\n");
+                currentPosition.append("国家:").append(bdLocation.getCountry()).append("\n");
+                currentPosition.append("省:").append(bdLocation.getProvince()).append("\n");
+                currentPosition.append("市:").append(bdLocation.getCity()).append("\n");
+                currentPosition.append("区:").append(bdLocation.getDistrict()).append("\n");
+                currentPosition.append("街道:").append(bdLocation.getStreet()).append("\n");
                 currentPosition.append("定位方式:");
                 if (bdLocation.getLocType() == BDLocation.TypeGpsLocation) {
                     currentPosition.append("GPS");
@@ -60,10 +81,15 @@ public class MainActivity extends AppCompatActivity {
                     currentPosition.append("网络");
                 }
                 txtPosition.setText(currentPosition);
+
+
             }
         });
 
         mMapView = findViewById(R.id.mapView);
+        mBaiduMap = mMapView.getMap();
+        mBaiduMap.setMyLocationEnabled(true);
+
         txtPosition = findViewById(R.id.txt_position);
         requestPermissions();
     }
@@ -105,7 +131,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestLocation() {
+        initLocation();
         mLocationClient.start();
+    }
+
+    private void initLocation() {
+        LocationClientOption option = new LocationClientOption();
+        option.setScanSpan(1000);
+        option.setOpenGps(true); // 打开gps
+        option.setCoorType("bd09ll"); // 设置坐标类型
+        //option.setLocationMode(LocationClientOption.LocationMode.Device_Sensors);
+        option.setIsNeedAddress(true);
+        mLocationClient.setLocOption(option);
     }
 
     @Override
@@ -122,7 +159,11 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
+        mLocationClient.stop();
+        mBaiduMap.setMyLocationEnabled(false);
         mMapView.onDestroy();
+        mMapView = null;
+
+        super.onDestroy();
     }
 }
